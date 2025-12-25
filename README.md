@@ -45,7 +45,7 @@
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white font-bold">J</div>
-                <h1 id="navTitle" class="text-xl font-bold text-primary">دليل الاستيفاء المكاني اعداد:انس الجعبري</h1>
+                <h1 id="navTitle" class="text-xl font-bold text-primary">دليل الاستيفاء المكاني </h1>
             </div>
             <button onclick="toggleLanguage()" class="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-blue-800 transition flex items-center gap-2">
                 <span id="langLabel">English</span>
