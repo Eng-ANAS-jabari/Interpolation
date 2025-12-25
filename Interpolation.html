@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="mainHtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دليل الاستيفاء المكاني التفاعلي | Spatial Interpolation Guide</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e3a8a',
+                        secondary: '#f97316',
+                        accent: '#10b981',
+                        bgLight: '#f8fafc'
+                    },
+                    fontFamily: {
+                        ar: ['Cairo', 'sans-serif'],
+                        en: ['Roboto', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root { --main-font: 'Cairo'; }
+        body { font-family: var(--main-font), sans-serif; background-color: #f8fafc; transition: all 0.3s ease; }
+        .chart-container { position: relative; width: 100%; height: 320px; }
+        .math-formula { direction: ltr; font-family: 'Courier New', Courier, monospace; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        [dir="ltr"] { text-align: left; }
+        [dir="rtl"] { text-align: right; }
+    </style>
+
+    <!-- Application Structure Plan:
+         - Localization System: A JS-based dictionary for all text elements.
+         - Interactive Explainer: Each card acts as a trigger for a detailed modal explaining the logic and math.
+         - Math Lab: Updated to reflect language changes in real-time.
+    -->
+    <!-- Visualization & Content Choices:
+         - Chart.js for all math concepts.
+         - Tailwind for responsive grid and modal layouts.
+         - No SVG or Mermaid used.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="text-slate-800">
+
+    <!-- Navigation & Language Switcher -->
+    <nav class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white font-bold">G</div>
+                <h1 id="navTitle" class="text-xl font-bold text-primary">دليل الاستيفاء المكاني</h1>
+            </div>
+            <button onclick="toggleLanguage()" class="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-blue-800 transition flex items-center gap-2">
+                <span id="langLabel">English</span>
+                <div id="langIndicator" class="w-3 h-3 bg-accent rounded-full animate-pulse"></div>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <header class="bg-gradient-to-r from-primary to-blue-700 text-white py-12 px-4 text-center">
+        <h2 id="headerMain" class="text-3xl md:text-5xl font-bold mb-4">أدوات تحليل البيانات المكانية</h2>
+        <p id="headerSub" class="text-lg md:text-xl opacity-90 max-w-3xl mx-auto">تعرف على القوانين الرياضية وطرق عمل الخوارزميات المستخدمة في نظم المعلومات الجغرافية.</p>
+    </header>
+
+    <main class="container mx-auto px-4 py-10">
+        
+        <!-- Interactive Graph Section -->
+        <section class="mb-16 bg-white rounded-3xl p-6 shadow-xl border border-slate-100">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1">
+                    <h3 id="labTitle" class="text-2xl font-bold text-primary mb-4">المختبر البصري</h3>
+                    <p id="labDesc" class="text-slate-600 mb-6">اختر مفهوماً رياضياً لمشاهدة كيف تؤثر المعاملات على النتيجة النهائية.</p>
+                    <div class="flex flex-col gap-2">
+                        <button onclick="updateChart('idw')" id="btn-idw" class="lab-btn active p-3 rounded-xl border-2 border-primary bg-blue-50 text-primary font-bold">IDW: Inverse Distance</button>
+                        <button onclick="updateChart('poly')" id="btn-poly" class="lab-btn p-3 rounded-xl border-2 border-slate-200 hover:border-primary transition font-bold">Polynomial: Trend</button>
+                        <button onclick="updateChart('krig')" id="btn-krig" class="lab-btn p-3 rounded-xl border-2 border-slate-200 hover:border-primary transition font-bold">Kriging: Variogram</button>
+                    </div>
+                </div>
+                <div class="lg:col-span-2">
+                    <div class="chart-container">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                    <div id="chartContext" class="mt-4 p-4 bg-slate-50 rounded-xl text-center italic text-slate-500 text-sm">
+                        يوضح الرسم كيف يقل تأثير النقطة مع زيادة المسافة في قانون IDW.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tools Grid -->
+        <div id="toolsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Dynamically Injected Cards -->
+        </div>
+    </main>
+
+    <!-- Modal for Detailed Explanation -->
+    <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
+            <div class="bg-primary p-6 text-white flex justify-between items-center">
+                <h3 id="modalTitle" class="text-2xl font-bold">اسم الأداة</h3>
+                <button onclick="closeModal()" class="text-white hover:bg-white/20 p-2 rounded-full">&times;</button>
+            </div>
+            <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div>
+                    <h4 id="labelFormula" class="text-secondary font-bold uppercase tracking-wider mb-2">القانون الرياضي</h4>
+                    <div id="modalFormula" class="math-formula bg-slate-900 text-green-400 p-6 rounded-2xl text-xl mb-6 shadow-inner">
+                        Z = sum(w * z) / sum(w)
+                    </div>
+                    <h4 id="labelExplanation" class="text-secondary font-bold uppercase tracking-wider mb-2">الشرح</h4>
+                    <p id="modalExpl" class="text-slate-700 leading-relaxed">هنا شرح مفصل للطريقة...</p>
+                </div>
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                    <h4 id="labelExample" class="text-primary font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                        💡 <span id="labelExampleText">مثال واقعي</span>
+                    </h4>
+                    <p id="modalExample" class="text-slate-600 italic">هنا مثال تطبيقي...</p>
+                    <div class="mt-8">
+                        <h4 id="labelTip" class="text-accent font-bold mb-2">نصيحة تقنية</h4>
+                        <p id="modalTip" class="text-sm text-slate-500">استخدم هذه الطريقة عندما تكون البيانات كثيفة.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 bg-slate-50 flex justify-end">
+                <button onclick="closeModal()" id="btnDone" class="bg-primary text-white px-8 py-2 rounded-xl font-bold">تم</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Localization Dictionary ---
+        const i18n = {
+            ar: {
+                navTitle: "دليل الاستيفاء المكاني",
+                langLabel: "English",
+                headerMain: "أدوات تحليل البيانات المكانية",
+                headerSub: "تعرف على القوانين الرياضية وطرق عمل الخوارزميات المستخدمة في نظم المعلومات الجغرافية.",
+                labTitle: "المختبر البصري",
+                labDesc: "اختر مفهوماً رياضياً لمشاهدة كيف تؤثر المعاملات على النتيجة النهائية.",
+                chartContext: "يوضح الرسم كيف يقل تأثير النقطة مع زيادة المسافة في قانون IDW.",
+                labelFormula: "القانون الرياضي",
+                labelExplanation: "شرح الآلية",
+                labelExampleText: "مثال واقعي",
+                labelTip: "نصيحة تقنية",
+                btnDone: "إغلاق",
+                methods: [
+                    { id: 'ebk', name: 'EBK', arName: 'الكريج البايزي التجريبي', summary: 'دقة عالية مع تقدير الأخطاء آلياً.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'يعتمد على بناء مئات النماذج الفرعية للسيميفاريوجرام للتعامل مع عدم اليقين في البيانات.', example: 'تقدير مستويات الأمطار في مناطق جبلية معقدة التضاريس.', tip: 'الأفضل لخرائط الأطلس الدقيقة.', icon: '📊' },
+                    { id: 'idw', name: 'IDW', arName: 'وزن المسافة المعكوس', summary: 'النقاط الأقرب لها تأثير أكبر.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'يتم حساب القيمة بناءً على متوسط مرجح للمسافات، حيث يقل الوزن مع زيادة البعد.', example: 'تحديد مستويات تلوث الهواء حول المصانع.', tip: 'سريع جداً للبيانات الكثيفة.', icon: '🎯' },
+                    { id: 'rbf', name: 'RBF', arName: 'دوال الأساس الشعاعي', summary: 'إنشاء أسطح ناعمة ومرنة.', formula: 'f(x) = Σ wᵢ φ(||x-cᵢ||)', expl: 'يعمل كغشاء مطاطي يتم شده فوق النقاط المعلومة للحصول على انسيابية تامة.', example: 'تمثيل درجات الحرارة السطحية.', tip: 'تجنب استخدامه مع البيانات ذات التغير الحاد.', icon: '〰️' },
+                    { id: 'gpoly', name: 'Global Polynomial', arName: 'كثيرات الحدود العام', summary: 'تحديد الاتجاهات العامة الكبرى.', formula: 'Z = a + bX + cY + dX²', expl: 'يتم ملاءمة سطح رياضي واحد على كامل منطقة الدراسة لكشف "الصورة الكبيرة".', example: 'معرفة ميل طبقة المياه الجوفية تحت دولة كاملة.', tip: 'يكشف الاتجاه (Trend) ولا يمر بالنقاط بدقة.', icon: '📉' },
+                    { id: 'lpoly', name: 'Local Polynomial', arName: 'كثيرات الحدود المحلي', summary: 'التقاط التباينات المحلية.', formula: 'Z_loc = Weighted Regression', expl: 'يقوم بحساب معادلات متعددة داخل نوافذ متحركة متداخلة لالتقاط التغيرات الصغيرة.', example: 'دراسة التلوث في منطقة صناعية صغيرة.', tip: 'أكثر مرونة من الطريقة العامة.', icon: '🔍' },
+                    { id: 'diff', name: 'Diffusion with Barriers', arName: 'الانتشار مع الحواجز', summary: 'الانتشار مع احترام العوائق المادية.', formula: '∂u/∂t = α∇²u', expl: 'يحاكي تدفق الحرارة أو السوائل، بحيث لا يتخطى التأثير الحواجز كالجدران أو الجزر.', example: 'تتبع بقعة زيت حول كواسر الأمواج.', tip: 'مثالي للبيئات الحضرية المزدحمة.', icon: '🚧' },
+                    { id: 'kern', name: 'Kernel with Barriers', arName: 'النواة مع الحواجز', summary: 'استيفاء ناعم يحترم الحدود.', formula: 'K(d) = Smooth Weighting', expl: 'يستخدم دوال النواة (Kernel) لتنعيم السطح مع مراعاة العوائق الجغرافية.', example: 'تقدير عمق المياه في الموانئ.', tip: 'يستخدم عندما تكون المسافة غير خطية بسبب العوائق.', icon: '🥨' },
+                    { id: 'move', name: 'Moving Window Kriging', arName: 'كريج النافذة المتحركة', summary: 'التعامل مع البيانات غير المتجانسة.', formula: 'Local Semivariance', expl: 'يطبق الكريج محلياً، حيث يتم حساب معايير السيميفاريوجرام بشكل منفصل لكل نافذة.', example: 'خرائط التربة في مناطق شاسعة متنوعة الجيولوجيا.', tip: 'يتطلب قدرة معالجة عالية.', icon: '🖼️' }
+                ]
+            },
+            en: {
+                navTitle: "Spatial Interpolation Guide",
+                langLabel: "عربي",
+                headerMain: "Spatial Data Analysis Tools",
+                headerSub: "Understand the mathematical laws and logic behind the most common GIS algorithms.",
+                labTitle: "Visual Math Lab",
+                labDesc: "Choose a mathematical concept to see how parameters affect the final surface.",
+                chartContext: "This graph shows how a point's influence decays as distance increases in IDW.",
+                labelFormula: "Mathematical Formula",
+                labelExplanation: "Mechanism Explanation",
+                labelExampleText: "Real-World Example",
+                labelTip: "Pro Tip",
+                btnDone: "Close",
+                methods: [
+                    { id: 'ebk', name: 'EBK', arName: 'Empirical Bayesian Kriging', summary: 'High accuracy with automated error estimation.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'Uses hundreds of semivariogram simulations to account for spatial uncertainty.', example: 'Rainfall estimation in complex terrains.', tip: 'Best for professional atlas maps.', icon: '📊' },
+                    { id: 'idw', name: 'IDW', arName: 'Inverse Distance Weighted', summary: 'Closer points have more influence.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'Calculates a weighted average where weights decrease as distance from the prediction location increases.', example: 'Air pollution mapping near factories.', tip: 'Very fast for dense datasets.', icon: '🎯' },
+                    { id: 'rbf', name: 'RBF', arName: 'Radial Basis Functions', summary: 'Creates smooth, flexible surfaces.', formula: 'f(x) = Σ wᵢ φ(||x-cᵢ||)', expl: 'Acts like a thin elastic membrane stretched over input data points.', example: 'Surface temperature modeling.', tip: 'Avoid with datasets showing sharp changes.', icon: '〰️' },
+                    { id: 'gpoly', name: 'Global Polynomial', arName: 'Global Polynomial', summary: 'Identifies long-range major trends.', formula: 'Z = a + bX + cY + dX²', expl: 'Fits a single mathematical function to the entire dataset to reveal patterns.', example: 'General groundwater slope across a country.', tip: 'Shows the trend, not exact values.', icon: '📉' },
+                    { id: 'lpoly', name: 'Local Polynomial', arName: 'Local Polynomial', summary: 'Captures local variations.', formula: 'Z_loc = Weighted Regression', expl: 'Calculates multiple polynomials within overlapping neighborhoods for flexibility.', example: 'Analyzing soil pH in a varied industrial site.', tip: 'More flexible than global methods.', icon: '🔍' },
+                    { id: 'diff', name: 'Diffusion with Barriers', arName: 'Diffusion with Barriers', summary: 'Spreads values respecting physical obstacles.', formula: '∂u/∂t = α∇²u', expl: 'Simulates heat or fluid flow that cannot pass through barriers like walls or cliffs.', example: 'Oil spill tracking around breakwaters.', tip: 'Perfect for urban or coastal areas.', icon: '🚧' },
+                    { id: 'kern', name: 'Kernel with Barriers', arName: 'Kernel with Barriers', summary: 'Smooth interpolation respecting boundaries.', formula: 'K(d) = Smooth Weighting', expl: 'Uses kernel functions to smooth the surface while obeying physical geography limits.', example: 'Water depth estimation in complex ports.', tip: 'Use when distance is non-linear due to obstacles.', icon: '🥨' },
+                    { id: 'move', name: 'Moving Window Kriging', arName: 'Moving Window Kriging', summary: 'Handles non-stationary datasets.', formula: 'Local Semivariance', expl: 'Applies Kriging locally by recalculating parameters for each sliding window.', example: 'Soil mapping in vast territories with diverse geology.', tip: 'Requires significant computing power.', icon: '🖼️' }
+                ]
+            }
+        };
+
+        let currentLang = 'ar';
+        let chart = null;
+
+        // --- 2. Core Functions ---
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'ar' ? 'en' : 'ar';
+            const html = document.getElementById('mainHtml');
+            html.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            html.lang = currentLang;
+            document.body.style.fontFamily = currentLang === 'ar' ? 'Cairo' : 'Roboto';
+            
+            updateUI();
+        }
+
+        function updateUI() {
+            const data = i18n[currentLang];
+            document.getElementById('navTitle').innerText = data.navTitle;
+            document.getElementById('langLabel').innerText = data.langLabel;
+            document.getElementById('headerMain').innerText = data.headerMain;
+            document.getElementById('headerSub').innerText = data.headerSub;
+            document.getElementById('labTitle').innerText = data.labTitle;
+            document.getElementById('labDesc').innerText = data.labDesc;
+            document.getElementById('chartContext').innerText = data.chartContext;
+            
+            // Modal labels
+            document.getElementById('labelFormula').innerText = data.labelFormula;
+            document.getElementById('labelExplanation').innerText = data.labelExplanation;
+            document.getElementById('labelExampleText').innerText = data.labelExampleText;
+            document.getElementById('labelTip').innerText = data.labelTip;
+            document.getElementById('btnDone').innerText = data.btnDone;
+
+            renderCards();
+            if(chart) chart.destroy();
+            initChart();
+        }
+
+        function renderCards() {
+            const grid = document.getElementById('toolsGrid');
+            grid.innerHTML = '';
+            i18n[currentLang].methods.forEach(method => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-6 rounded-3xl shadow-lg border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer group";
+                card.onclick = () => openModal(method.id);
+                card.innerHTML = `
+                    <div class="text-4xl mb-4 group-hover:scale-110 transition">${method.icon}</div>
+                    <h3 class="text-xl font-bold text-primary mb-2">${currentLang === 'ar' ? method.arName : method.name}</h3>
+                    <p class="text-slate-500 text-sm mb-4">${method.summary}</p>
+                    <div class="text-secondary font-bold text-xs uppercase tracking-tighter">Click for Detail / اضغط للتفاصيل</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openModal(id) {
+            const method = i18n[currentLang].methods.find(m => m.id === id);
+            document.getElementById('modalTitle').innerText = currentLang === 'ar' ? method.arName : method.name;
+            document.getElementById('modalFormula').innerText = method.formula;
+            document.getElementById('modalExpl').innerText = method.expl;
+            document.getElementById('modalExample').innerText = method.example;
+            document.getElementById('modalTip').innerText = method.tip;
+            
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        // --- 3. Chart Logic ---
+
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: getChartData('idw'),
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: currentLang === 'ar' ? 'التأثير' : 'Impact' } },
+                        x: { title: { display: true, text: currentLang === 'ar' ? 'المسافة' : 'Distance' } }
+                    }
+                }
+            });
+        }
+
+        function updateChart(type) {
+            // Update UI buttons
+            document.querySelectorAll('.lab-btn').forEach(b => b.classList.remove('active', 'bg-blue-50', 'border-primary', 'text-primary'));
+            document.getElementById(`btn-${type}`).classList.add('active', 'bg-blue-50', 'border-primary', 'text-primary');
+            
+            chart.data = getChartData(type);
+            chart.update();
+        }
+
+        function getChartData(type) {
+            const labels = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+            let data = [];
+            let color = '#1e3a8a';
+
+            if (type === 'idw') {
+                data = labels.map(l => l === 0 ? 100 : 1000 / (l * 0.5));
+                color = '#f97316';
+            } else if (type === 'poly') {
+                data = labels.map(l => 20 + (l * 0.4));
+                color = '#1e3a8a';
+            } else {
+                data = labels.map(l => 10 + (Math.sin(l/10) * 15) + (l/2));
+                color = '#10b981';
+            }
+
+            return {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + '22',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4
+                }]
+            };
+        }
+
+        window.onload = () => {
+            updateUI();
+        };
+
+    </script>
+</body>
+</html>
