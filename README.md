@@ -170,7 +170,7 @@
                 footerTitle: "دليل الاستيفاء المكاني التفاعلي",
                 footerDesc: "مصدر تعليمي مبسط لفهم الخوارزميات الرياضية في نظم المعلومات الجغرافية",
                 footerName: "إعداد المهندس",
-                Name_a: "إعداد المهندس",
+                Name_a: "أنس الجعبري ",
 
                 methods: [
                     { id: 'ebk', name: 'EBK', arName: 'الكريج البايزي التجريبي', summary: 'دقة عالية مع تقدير الأخطاء آلياً.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'يعتمد على بناء مئات النماذج الفرعية للسيميفاريوجرام للتعامل مع عدم اليقين في البيانات.', example: 'تقدير مستويات الأمطار في مناطق جبلية معقدة التضاريس.', tip: 'الأفضل لخرائط الأطلس الدقيقة.', icon: '📊' },
@@ -199,7 +199,7 @@
                 footerTitle: "Interactive Spatial Interpolation Guide",
                 footerDesc: "An educational resource for understanding mathematical algorithms in GIS",
                 footerName: "Prepared by Engineer",
-                Name_a: "إعداد المهندس",
+                Name_a: "Anas Jabari",
                 methods: [
                     { id: 'ebk', name: 'EBK', arName: 'Empirical Bayesian Kriging', summary: 'High accuracy with automated error estimation.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'Uses hundreds of semivariogram simulations to account for spatial uncertainty.', example: 'Rainfall estimation in complex terrains.', tip: 'Best for professional atlas maps.', icon: '📊' },
                     { id: 'idw', name: 'IDW', arName: 'Inverse Distance Weighted', summary: 'Closer points have more influence.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'Calculates a weighted average where weights decrease as distance from the prediction location increases.', example: 'Air pollution mapping near factories.', tip: 'Very fast for dense datasets.', icon: '🎯' },
