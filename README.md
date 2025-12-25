@@ -44,7 +44,7 @@
     <nav class="bg-white shadow-sm sticky top-0 z-40">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white font-bold">G</div>
+                <div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white font-bold">J</div>
                 <h1 id="navTitle" class="text-xl font-bold text-primary">دليل الاستيفاء المكاني اعداد:انس الجعبري</h1>
             </div>
             <button onclick="toggleLanguage()" class="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-blue-800 transition flex items-center gap-2">
@@ -170,6 +170,8 @@
                 footerTitle: "دليل الاستيفاء المكاني التفاعلي",
                 footerDesc: "مصدر تعليمي مبسط لفهم الخوارزميات الرياضية في نظم المعلومات الجغرافية",
                 footerName: "إعداد المهندس",
+                Name_a: "إعداد المهندس",
+
                 methods: [
                     { id: 'ebk', name: 'EBK', arName: 'الكريج البايزي التجريبي', summary: 'دقة عالية مع تقدير الأخطاء آلياً.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'يعتمد على بناء مئات النماذج الفرعية للسيميفاريوجرام للتعامل مع عدم اليقين في البيانات.', example: 'تقدير مستويات الأمطار في مناطق جبلية معقدة التضاريس.', tip: 'الأفضل لخرائط الأطلس الدقيقة.', icon: '📊' },
                     { id: 'idw', name: 'IDW', arName: 'وزن المسافة المعكوس', summary: 'النقاط الأقرب لها تأثير أكبر.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'يتم حساب القيمة بناءً على متوسط مرجح للمسافات، حيث يقل الوزن مع زيادة البعد.', example: 'تحديد مستويات تلوث الهواء حول المصانع.', tip: 'سريع جداً للبيانات الكثيفة.', icon: '🎯' },
@@ -197,8 +199,7 @@
                 footerTitle: "Interactive Spatial Interpolation Guide",
                 footerDesc: "An educational resource for understanding mathematical algorithms in GIS",
                 footerName: "Prepared by Engineer",
-                footerRole: "GIS Systems Developer",
-                footerCopyright: "© 2023 All Rights Reserved | Educational Non-Profit Tool",
+                Name_a: "إعداد المهندس",
                 methods: [
                     { id: 'ebk', name: 'EBK', arName: 'Empirical Bayesian Kriging', summary: 'High accuracy with automated error estimation.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'Uses hundreds of semivariogram simulations to account for spatial uncertainty.', example: 'Rainfall estimation in complex terrains.', tip: 'Best for professional atlas maps.', icon: '📊' },
                     { id: 'idw', name: 'IDW', arName: 'Inverse Distance Weighted', summary: 'Closer points have more influence.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'Calculates a weighted average where weights decrease as distance from the prediction location increases.', example: 'Air pollution mapping near factories.', tip: 'Very fast for dense datasets.', icon: '🎯' },
