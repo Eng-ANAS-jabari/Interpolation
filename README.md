@@ -1,382 +1,306 @@
-<html lang="ar" dir="rtl" id="mainHtml">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>دليل الاستيفاء المكاني التفاعلي | Spatial Interpolation Guide</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc, onSnapshot, query, serverTimestamp } from 'firebase/firestore';
+import { Timer, Users, Trophy, LayoutDashboard, Send, CheckCircle, Lock, ShieldCheck } from 'lucide-react';
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#1e3a8a',
-                        secondary: '#f97316',
-                        accent: '#10b981',
-                        bgLight: '#f8fafc'
-                    },
-                    fontFamily: {
-                        ar: ['Cairo', 'sans-serif'],
-                        en: ['Roboto', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
+// Firebase Configuration
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'civil-tech-2024';
 
-    <style>
-        :root { --main-font: 'Cairo'; }
-        body { font-family: var(--main-font), sans-serif; background-color: #f8fafc; transition: all 0.3s ease; }
-        .chart-container { position: relative; width: 100%; height: 320px; }
-        .math-formula { direction: ltr; font-family: 'Courier New', Courier, monospace; }
-        .fade-in { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        [dir="ltr"] { text-align: left; }
-        [dir="rtl"] { text-align: right; }
-    </style>
-</head>
-<body class="text-slate-800 flex flex-col min-h-screen">
+const CONFERENCE_DATE = new Date('2024-12-30T09:00:00').getTime();
+const ADMIN_PASSCODE = "1234"; // يمكنك تغيير رمز الدخول من هنا
 
-    <!-- Navigation & Language Switcher -->
-    <nav class="bg-white shadow-sm sticky top-0 z-40">
-        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white font-bold">J</div>
-                <h1 id="navTitle" class="text-xl font-bold text-primary">دليل الاستيفاء المكاني </h1>
-            </div>
-            <button onclick="toggleLanguage()" class="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-blue-800 transition flex items-center gap-2">
-                <span id="langLabel">English</span>
-                <div id="langIndicator" class="w-3 h-3 bg-accent rounded-full animate-pulse"></div>
-            </button>
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('home'); 
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [timeLeft, setTimeLeft] = useState({});
+  const [formData, setFormData] = useState({ name: '', email: '', competition: 'الابتكار الهندسي', phone: '' });
+  const [submissions, setSubmissions] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState(false);
+  const [adminError, setAdminError] = useState('');
+
+  // Auth logic
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        console.error("Auth error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Submissions for Admin (Only if authenticated)
+  useEffect(() => {
+    if (!user || !isAdminAuthenticated || view !== 'admin') return;
+
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'registrations');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSubmissions(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
+    }, (error) => {
+      console.error("Firestore error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user, view, isAdminAuthenticated]);
+
+  // Countdown Logic
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = CONFERENCE_DATE - now;
+
+      setTimeLeft({
+        days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((distance % (1000 * 60)) / 1000)
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registrations'), {
+        ...formData,
+        userId: user.uid,
+        timestamp: serverTimestamp()
+      });
+      setSuccessMsg(true);
+      setFormData({ name: '', email: '', competition: 'الابتكار الهندسي', phone: '' });
+      setTimeout(() => setSuccessMsg(false), 5000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    if (passcodeInput === ADMIN_PASSCODE) {
+      setIsAdminAuthenticated(true);
+      setAdminError('');
+    } else {
+      setAdminError('رمز الدخول غير صحيح!');
+    }
+  };
+
+  const Nav = () => (
+    <nav className="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-xl">
+      <div className="max-w-6xl mx-auto flex justify-between items-center">
+        <h1 className="text-2xl font-bold tracking-tighter flex items-center gap-2 cursor-pointer" onClick={() => setView('home')}>
+          <div className="bg-blue-600 p-1 rounded">CT</div> Civil Tech
+        </h1>
+        <div className="flex gap-6 items-center">
+          <button onClick={() => setView('home')} className={`hover:text-blue-400 transition ${view === 'home' ? 'text-blue-400' : ''}`}>الرئيسية</button>
+          <button onClick={() => setView('register')} className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition">سجل الآن</button>
+          <button onClick={() => setView('admin')} className={`flex items-center gap-1 text-sm ${view === 'admin' ? 'text-blue-400' : 'text-slate-400'}`}>
+            <LayoutDashboard size={16} /> لوحة التحكم
+          </button>
         </div>
+      </div>
     </nav>
+  );
 
-    <!-- Header Section -->
-    <header class="bg-gradient-to-r from-primary to-blue-700 text-white py-12 px-4 text-center">
-        <h2 id="headerMain" class="text-3xl md:text-5xl font-bold mb-4">أدوات تحليل البيانات المكانية</h2>
-        <p id="headerSub" class="text-lg md:text-xl opacity-90 max-w-3xl mx-auto">تعرف على القوانين الرياضية وطرق عمل الخوارزميات المستخدمة في نظم المعلومات الجغرافية.</p>
-    </header>
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-right" dir="rtl">
+      <Nav />
 
-    <main class="container mx-auto px-4 py-10 flex-grow">
-        
-        <!-- Interactive Graph Section -->
-        <section class="mb-16 bg-white rounded-3xl p-6 shadow-xl border border-slate-100">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-1">
-                    <h3 id="labTitle" class="text-2xl font-bold text-primary mb-4">المختبر البصري</h3>
-                    <p id="labDesc" class="text-slate-600 mb-6">اختر مفهوماً رياضياً لمشاهدة كيف تؤثر المعاملات على النتيجة النهائية.</p>
-                    <div class="flex flex-col gap-2">
-                        <button onclick="updateChart('idw')" id="btn-idw" class="lab-btn active p-3 rounded-xl border-2 border-primary bg-blue-50 text-primary font-bold hover:shadow-md transition">IDW: Inverse Distance</button>
-                        <button onclick="updateChart('poly')" id="btn-poly" class="lab-btn p-3 rounded-xl border-2 border-slate-200 hover:border-primary transition font-bold hover:shadow-md">Polynomial: Trend</button>
-                        <button onclick="updateChart('krig')" id="btn-krig" class="lab-btn p-3 rounded-xl border-2 border-slate-200 hover:border-primary transition font-bold hover:shadow-md">Kriging: Variogram</button>
-                    </div>
-                </div>
-                <div class="lg:col-span-2">
-                    <div class="chart-container">
-                        <canvas id="mainChart"></canvas>
-                    </div>
-                    <div id="chartContext" class="mt-4 p-4 bg-slate-50 rounded-xl text-center italic text-slate-500 text-sm">
-                       الرسم البياني يوضح تأثير النقاط.
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Tools Grid -->
-        <div id="toolsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <!-- Dynamically Injected Cards -->
-        </div>
-    </main>
-
-    <!-- Footer Section -->
-    <footer class="mt-16 bg-gradient-to-r from-slate-800 to-slate-900 text-white py-10 px-4">
-        <div class="container mx-auto">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
-                <div class="text-center md:text-right">
-                    <h3 class="text-2xl font-bold mb-2" id="footerTitle">دليل الاستيفاء المكاني التفاعلي</h3>
-                    <p class="text-slate-300 max-w-lg" id="footerDesc">مصدر تعليمي مبسط لفهم الخوارزميات الرياضية في نظم المعلومات الجغرافية</p>
-                </div>
-                
-                <div class="bg-slate-700/30 backdrop-blur-sm p-6 rounded-2xl border border-slate-600">
-                    <div class="flex flex-col items-center">
-                        <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mb-4 shadow-lg">
-                            <span class="text-2xl font-bold text-white">A</span>
-                        </div>
-                        <div class="text-center">
-                            <h4 class="font-bold text-lg mb-1" id="footerName">إعداد المهندس</h4>
-                            <p class="text-xl font-bold text-secondary">أنس الجعبري</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      {view === 'home' && (
+        <main>
+          <section className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-24 px-4 text-center">
+            <h2 className="text-5xl md:text-7xl font-black mb-6">مؤتمر Civil Tech 2024</h2>
+            <p className="text-xl text-slate-300 mb-12 max-w-2xl mx-auto leading-relaxed">
+              المستقبل يبدأ هنا. انضم إلى نخبة المهندسين والمبتكرين في أضخم حدث تكنولوجي في الهندسة المدنية.
+            </p>
             
-            <div class="mt-10 pt-6 border-t border-slate-700 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mb-16">
+              {[
+                { label: 'يوم', value: timeLeft.days },
+                { label: 'ساعة', value: timeLeft.hours },
+                { label: 'دقيقة', value: timeLeft.minutes },
+                { label: 'ثانية', value: timeLeft.seconds }
+              ].map((item, i) => (
+                <div key={i} className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 shadow-2xl">
+                  <div className="text-4xl md:text-6xl font-mono font-bold text-blue-400">
+                    {item.value || '0'}
+                  </div>
+                  <div className="text-sm uppercase tracking-widest text-slate-400 mt-2">{item.label}</div>
+                </div>
+              ))}
             </div>
-        </div>
-    </footer>
 
-    <!-- Modal for Detailed Explanation -->
-    <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden animate-fade-in max-h-[90vh] overflow-y-auto">
-            <div class="bg-primary p-6 text-white flex justify-between items-center sticky top-0">
-                <h3 id="modalTitle" class="text-2xl font-bold">اسم الأداة</h3>
-                <button onclick="closeModal()" class="text-white hover:bg-white/20 p-2 rounded-full transition text-2xl">&times;</button>
+            <button 
+              onClick={() => setView('register')}
+              className="bg-blue-600 text-white px-10 py-4 rounded-full text-xl font-bold hover:bg-blue-500 transform hover:scale-105 transition shadow-lg shadow-blue-500/20"
+            >
+              سجل في المسابقات
+            </button>
+          </section>
+
+          <section className="max-w-6xl mx-auto py-20 px-4 grid md:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trophy className="text-blue-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">مسابقات تقنية</h3>
+              <p className="text-slate-600">نافس في تحديات الهندسة المدنية واربح جوائز قيمة.</p>
             </div>
-            <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center">
+              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="text-green-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">شبكة علاقات</h3>
+              <p className="text-slate-600">تواصل مع كبار الخبراء والشركات في هذا القطاع.</p>
+            </div>
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Timer className="text-purple-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">ورش عمل</h3>
+              <p className="text-slate-600">تعلم أحدث التقنيات المستخدمة في التصميم والإنشاء.</p>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {view === 'register' && (
+        <section className="max-w-xl mx-auto py-16 px-4">
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
+            <div className="text-center mb-10">
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">تسجيل مسابقة</h2>
+              <p className="text-slate-500">يرجى تعبئة البيانات بدقة للمشاركة</p>
+            </div>
+
+            {successMsg ? (
+              <div className="bg-green-50 border border-green-200 text-green-700 p-6 rounded-2xl text-center flex flex-col items-center gap-4">
+                <CheckCircle size={48} />
+                <h4 className="font-bold text-lg">تم التسجيل بنجاح!</h4>
+                <button onClick={() => setView('home')} className="mt-4 text-green-800 underline">العودة للرئيسية</button>
+              </div>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-6">
                 <div>
-                    <h4 id="labelFormula" class="text-secondary font-bold uppercase tracking-wider mb-2">القانون الرياضي</h4>
-                    <div id="modalFormula" class="math-formula bg-slate-900 text-green-400 p-6 rounded-2xl text-xl mb-6 shadow-inner overflow-x-auto">
-                        Z = sum(w * z) / sum(w)
-                    </div>
-                    <h4 id="labelExplanation" class="text-secondary font-bold uppercase tracking-wider mb-2">الشرح</h4>
-                    <p id="modalExpl" class="text-slate-700 leading-relaxed">هنا شرح مفصل للطريقة...</p>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">الاسم الكامل</label>
+                  <input required type="text" className="w-full px-4 py-3 rounded-xl border border-slate-300" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
-                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <h4 id="labelExample" class="text-primary font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                        💡 <span id="labelExampleText">مثال واقعي</span>
-                    </h4>
-                    <p id="modalExample" class="text-slate-600 italic">هنا مثال تطبيقي...</p>
-                    <div class="mt-8">
-                        <h4 id="labelTip" class="text-accent font-bold mb-2">نصيحة تقنية</h4>
-                        <p id="modalTip" class="text-sm text-slate-500">استخدم هذه الطريقة عندما تكون البيانات كثيفة.</p>
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">البريد الإلكتروني</label>
+                  <input required type="email" className="w-full px-4 py-3 rounded-xl border border-slate-300" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">رقم الهاتف</label>
+                  <input required type="tel" className="w-full px-4 py-3 rounded-xl border border-slate-300" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">اختر المسابقة</label>
+                  <select className="w-full px-4 py-3 rounded-xl border border-slate-300" value={formData.competition} onChange={e => setFormData({...formData, competition: e.target.value})}>
+                    <option>الابتكار الهندسي</option>
+                    <option>أفضل تصميم إنشائي</option>
+                    <option>تكنولوجيا الاستدامة</option>
+                  </select>
+                </div>
+                <button disabled={isSubmitting} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition">
+                  {isSubmitting ? 'جاري الإرسال...' : 'إرسال الطلب'}
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
+
+      {view === 'admin' && (
+        <section className="max-w-6xl mx-auto py-12 px-4">
+          {!isAdminAuthenticated ? (
+            <div className="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
+              <div className="text-center mb-8">
+                <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="text-slate-600" size={24} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">دخول المسؤول</h2>
+                <p className="text-slate-500 text-sm">هذه المنطقة محمية، يرجى إدخال الرمز السري</p>
+              </div>
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <input 
+                  type="password" 
+                  placeholder="أدخل الرمز السري" 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-center text-2xl tracking-widest outline-none focus:ring-2 focus:ring-blue-500"
+                  value={passcodeInput}
+                  onChange={e => setPasscodeInput(e.target.value)}
+                />
+                {adminError && <p className="text-red-500 text-sm text-center font-bold">{adminError}</p>}
+                <button className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition">دخول</button>
+              </form>
             </div>
-            <div class="p-6 bg-slate-50 flex justify-end sticky bottom-0">
-                <button onclick="closeModal()" id="btnDone" class="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-800 transition">تم</button>
-            </div>
-        </div>
+          ) : (
+            <>
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-100 p-2 rounded-lg text-green-600">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <h2 className="text-3xl font-bold text-slate-900">لوحة تحكم المسؤول</h2>
+                </div>
+                <div className="flex gap-4">
+                  <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-bold">إجمالي المسجلين: {submissions.length}</div>
+                  <button onClick={() => setIsAdminAuthenticated(false)} className="text-slate-400 hover:text-red-500 text-sm">خروج من الوضع الآمن</button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="px-6 py-4 font-bold text-slate-700">الاسم</th>
+                        <th className="px-6 py-4 font-bold text-slate-700">البريد</th>
+                        <th className="px-6 py-4 font-bold text-slate-700">الهاتف</th>
+                        <th className="px-6 py-4 font-bold text-slate-700">المسابقة</th>
+                        <th className="px-6 py-4 font-bold text-slate-700">التاريخ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {submissions.map((sub) => (
+                        <tr key={sub.id} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-4 font-medium">{sub.name}</td>
+                          <td className="px-6 py-4 text-slate-600 font-mono text-sm">{sub.email}</td>
+                          <td className="px-6 py-4 text-slate-600">{sub.phone}</td>
+                          <td className="px-6 py-4">
+                            <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">{sub.competition}</span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-400 text-sm">
+                            {sub.timestamp ? new Date(sub.timestamp.seconds * 1000).toLocaleDateString('ar-EG') : '...'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      <footer className="py-12 border-t border-slate-200 text-center text-slate-500">
+        <p>© 2024 مؤتمر Civil Tech. جميع الحقوق محفوظة.</p>
+      </footer>
     </div>
-
-    <script>
-        // --- 1. Localization Dictionary ---
-        const i18n = {
-            ar: {
-                navTitle: "دليل الاستيفاء المكاني",
-                langLabel: "English",
-                headerMain: "أدوات تحليل البيانات المكانية",
-                headerSub: "تعرف على القوانين الرياضية وطرق عمل الخوارزميات المستخدمة في نظم المعلومات الجغرافية.",
-                labTitle: "المختبر البصري",
-                labDesc: "اختر مفهوماً رياضياً لمشاهدة كيف تؤثر المعاملات على النتيجة النهائية.",
-                chartContext: "يوضح الرسم كيف يقل تأثير النقطة مع زيادة المسافة في قانون IDW.",
-                labelFormula: "القانون الرياضي",
-                labelExplanation: "شرح الآلية",
-                labelExampleText: "مثال واقعي",
-                labelTip: "نصيحة تقنية",
-                btnDone: "إغلاق",
-                footerTitle: "دليل الاستيفاء المكاني التفاعلي",
-                footerDesc: "مصدر تعليمي مبسط لفهم الخوارزميات الرياضية في نظم المعلومات الجغرافية",
-                footerName: "إعداد المهندس",
-                Name_a: "أنس الجعبري ",
-
-                methods: [
-                    { id: 'ebk', name: 'EBK', arName: 'الكريج البايزي التجريبي', summary: 'دقة عالية مع تقدير الأخطاء آلياً.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'يعتمد على بناء مئات النماذج الفرعية للسيميفاريوجرام للتعامل مع عدم اليقين في البيانات.', example: 'تقدير مستويات الأمطار في مناطق جبلية معقدة التضاريس.', tip: 'الأفضل لخرائط الأطلس الدقيقة.', icon: '📊' },
-                    { id: 'idw', name: 'IDW', arName: 'وزن المسافة المعكوس', summary: 'النقاط الأقرب لها تأثير أكبر.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'يتم حساب القيمة بناءً على متوسط مرجح للمسافات، حيث يقل الوزن مع زيادة البعد.', example: 'تحديد مستويات تلوث الهواء حول المصانع.', tip: 'سريع جداً للبيانات الكثيفة.', icon: '🎯' },
-                    { id: 'rbf', name: 'RBF', arName: 'دوال الأساس الشعاعي', summary: 'إنشاء أسطح ناعمة ومرنة.', formula: 'f(x) = Σ wᵢ φ(||x-cᵢ||)', expl: 'يعمل كغشاء مطاطي يتم شده فوق النقاط المعلومة للحصول على انسيابية تامة.', example: 'تمثيل درجات الحرارة السطحية.', tip: 'تجنب استخدامه مع البيانات ذات التغير الحاد.', icon: '〰️' },
-                    { id: 'gpoly', name: 'Global Polynomial', arName: 'كثيرات الحدود العام', summary: 'تحديد الاتجاهات العامة الكبرى.', formula: 'Z = a + bX + cY + dX²', expl: 'يتم ملاءمة سطح رياضي واحد على كامل منطقة الدراسة لكشف "الصورة الكبيرة".', example: 'معرفة ميل طبقة المياه الجوفية تحت دولة كاملة.', tip: 'يكشف الاتجاه (Trend) ولا يمر بالنقاط بدقة.', icon: '📉' },
-                    { id: 'lpoly', name: 'Local Polynomial', arName: 'كثيرات الحدود المحلي', summary: 'التقاط التباينات المحلية.', formula: 'Z_loc = Weighted Regression', expl: 'يقوم بحساب معادلات متعددة داخل نوافذ متحركة متداخلة لالتقاط التغيرات الصغيرة.', example: 'دراسة التلوث في منطقة صناعية صغيرة.', tip: 'أكثر مرونة من الطريقة العامة.', icon: '🔍' },
-                    { id: 'diff', name: 'Diffusion with Barriers', arName: 'الانتشار مع الحواجز', summary: 'الانتشار مع احترام العوائق المادية.', formula: '∂u/∂t = α∇²u', expl: 'يحاكي تدفق الحرارة أو السوائل، بحيث لا يتخطى التأثير الحواجز كالجدران أو الجزر.', example: 'تتبع بقعة زيت حول كواسر الأمواج.', tip: 'مثالي للبيئات الحضرية المزدحمة.', icon: '🚧' },
-                    { id: 'kern', name: 'Kernel with Barriers', arName: 'النواة مع الحواجز', summary: 'استيفاء ناعم يحترم الحدود.', formula: 'K(d) = Smooth Weighting', expl: 'يستخدم دوال النواة (Kernel) لتنعيم السطح مع مراعاة العوائق الجغرافية.', example: 'تقدير عمق المياه في الموانئ.', tip: 'يستخدم عندما تكون المسافة غير خطية بسبب العوائق.', icon: '🥨' },
-                    { id: 'move', name: 'Moving Window Kriging', arName: 'كريج النافذة المتحركة', summary: 'التعامل مع البيانات غير المتجانسة.', formula: 'Local Semivariance', expl: 'يطبق الكريج محلياً، حيث يتم حساب معايير السيميفاريوجرام بشكل منفصل لكل نافذة.', example: 'خرائط التربة في مناطق شاسعة متنوعة الجيولوجيا.', tip: 'يتطلب قدرة معالجة عالية.', icon: '🖼️' }
-                ]
-            },
-            en: {
-                navTitle: "Spatial Interpolation Guide",
-                langLabel: "عربي",
-                headerMain: "Spatial Data Analysis Tools",
-                headerSub: "Understand the mathematical laws and logic behind the most common GIS algorithms.",
-                labTitle: "Visual Math Lab",
-                labDesc: "Choose a mathematical concept to see how parameters affect the final surface.",
-                chartContext: "This graph shows how a point's influence decays as distance increases in IDW.",
-                labelFormula: "Mathematical Formula",
-                labelExplanation: "Mechanism Explanation",
-                labelExampleText: "Real-World Example",
-                labelTip: "Pro Tip",
-                btnDone: "Close",
-                footerTitle: "Interactive Spatial Interpolation Guide",
-                footerDesc: "An educational resource for understanding mathematical algorithms in GIS",
-                footerName: "Prepared by Engineer",
-                Name_a: "Anas Jabari",
-                methods: [
-                    { id: 'ebk', name: 'EBK', arName: 'Empirical Bayesian Kriging', summary: 'High accuracy with automated error estimation.', formula: 'Ẑ(s₀) = Σ λᵢ Z(sᵢ)', expl: 'Uses hundreds of semivariogram simulations to account for spatial uncertainty.', example: 'Rainfall estimation in complex terrains.', tip: 'Best for professional atlas maps.', icon: '📊' },
-                    { id: 'idw', name: 'IDW', arName: 'Inverse Distance Weighted', summary: 'Closer points have more influence.', formula: 'wᵢ = 1 / dᵢᵖ', expl: 'Calculates a weighted average where weights decrease as distance from the prediction location increases.', example: 'Air pollution mapping near factories.', tip: 'Very fast for dense datasets.', icon: '🎯' },
-                    { id: 'rbf', name: 'RBF', arName: 'Radial Basis Functions', summary: 'Creates smooth, flexible surfaces.', formula: 'f(x) = Σ wᵢ φ(||x-cᵢ||)', expl: 'Acts like a thin elastic membrane stretched over input data points.', example: 'Surface temperature modeling.', tip: 'Avoid with datasets showing sharp changes.', icon: '〰️' },
-                    { id: 'gpoly', name: 'Global Polynomial', arName: 'Global Polynomial', summary: 'Identifies long-range major trends.', formula: 'Z = a + bX + cY + dX²', expl: 'Fits a single mathematical function to the entire dataset to reveal patterns.', example: 'General groundwater slope across a country.', tip: 'Shows the trend, not exact values.', icon: '📉' },
-                    { id: 'lpoly', name: 'Local Polynomial', arName: 'Local Polynomial', summary: 'Captures local variations.', formula: 'Z_loc = Weighted Regression', expl: 'Calculates multiple polynomials within overlapping neighborhoods for flexibility.', example: 'Analyzing soil pH in a varied industrial site.', tip: 'More flexible than global methods.', icon: '🔍' },
-                    { id: 'diff', name: 'Diffusion with Barriers', arName: 'Diffusion with Barriers', summary: 'Spreads values respecting physical obstacles.', formula: '∂u/∂t = α∇²u', expl: 'Simulates heat or fluid flow that cannot pass through barriers like walls or cliffs.', example: 'Oil spill tracking around breakwaters.', tip: 'Perfect for urban or coastal areas.', icon: '🚧' },
-                    { id: 'kern', name: 'Kernel with Barriers', arName: 'Kernel with Barriers', summary: 'Smooth interpolation respecting boundaries.', formula: 'K(d) = Smooth Weighting', expl: 'Uses kernel functions to smooth the surface while obeying physical geography limits.', example: 'Water depth estimation in complex ports.', tip: 'Use when distance is non-linear due to obstacles.', icon: '🥨' },
-                    { id: 'move', name: 'Moving Window Kriging', arName: 'Moving Window Kriging', summary: 'Handles non-stationary datasets.', formula: 'Local Semivariance', expl: 'Applies Kriging locally by recalculating parameters for each sliding window.', example: 'Soil mapping in vast territories with diverse geology.', tip: 'Requires significant computing power.', icon: '🖼️' }
-                ]
-            }
-        };
-
-        let currentLang = 'ar';
-        let chart = null;
-
-        // --- 2. Core Functions ---
-
-        function toggleLanguage() {
-            currentLang = currentLang === 'ar' ? 'en' : 'ar';
-            const html = document.getElementById('mainHtml');
-            html.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-            html.lang = currentLang;
-            document.body.style.fontFamily = currentLang === 'ar' ? 'Cairo' : 'Roboto';
-            
-            updateUI();
-        }
-
-        function updateUI() {
-            const data = i18n[currentLang];
-            // Update all text elements
-            Object.keys(data).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) element.innerText = data[key];
-            });
-            
-            renderCards();
-            if(chart) chart.destroy();
-            initChart();
-        }
-
-        function renderCards() {
-            const grid = document.getElementById('toolsGrid');
-            grid.innerHTML = '';
-            i18n[currentLang].methods.forEach(method => {
-                const card = document.createElement('div');
-                card.className = "bg-white p-6 rounded-3xl shadow-lg border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer group";
-                card.onclick = () => openModal(method.id);
-                card.innerHTML = `
-                    <div class="text-4xl mb-4 group-hover:scale-110 transition">${method.icon}</div>
-                    <h3 class="text-xl font-bold text-primary mb-2">${currentLang === 'ar' ? method.arName : method.name}</h3>
-                    <p class="text-slate-500 text-sm mb-4">${method.summary}</p>
-                    <div class="text-secondary font-bold text-xs uppercase tracking-tighter">${currentLang === 'ar' ? 'اضغط للتفاصيل' : 'Click for Detail'}</div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        function openModal(id) {
-            const method = i18n[currentLang].methods.find(m => m.id === id);
-            document.getElementById('modalTitle').innerText = currentLang === 'ar' ? method.arName : method.name;
-            document.getElementById('modalFormula').innerText = method.formula;
-            document.getElementById('modalExpl').innerText = method.expl;
-            document.getElementById('modalExample').innerText = method.example;
-            document.getElementById('modalTip').innerText = method.tip;
-            
-            document.getElementById('modal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; // Prevent background scrolling
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.add('hidden');
-            document.body.style.overflow = 'auto'; // Restore scrolling
-        }
-
-        // --- 3. Chart Logic ---
-
-        function initChart() {
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: getChartData('idw'),
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            title: { 
-                                display: true, 
-                                text: currentLang === 'ar' ? 'التأثير' : 'Impact',
-                                font: { size: 14, weight: 'bold' }
-                            } 
-                        },
-                        x: { 
-                            title: { 
-                                display: true, 
-                                text: currentLang === 'ar' ? 'المسافة' : 'Distance',
-                                font: { size: 14, weight: 'bold' }
-                            } 
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateChart(type) {
-            // Update UI buttons
-            document.querySelectorAll('.lab-btn').forEach(b => {
-                b.classList.remove('active', 'bg-blue-50', 'border-primary', 'text-primary');
-                b.classList.add('border-slate-200');
-            });
-            const activeBtn = document.getElementById(`btn-${type}`);
-            activeBtn.classList.add('active', 'bg-blue-50', 'border-primary', 'text-primary');
-            activeBtn.classList.remove('border-slate-200');
-            
-            chart.data = getChartData(type);
-            chart.update();
-            
-            // Update chart context text
-            const contextText = {
-                idw: currentLang === 'ar' ? 'يوضح الرسم كيف يقل تأثير النقطة مع زيادة المسافة في قانون IDW.' : 'This graph shows how a point\'s influence decays as distance increases in IDW.',
-                poly: currentLang === 'ar' ? 'يوضح الرسم الاتجاه العام للسطح باستخدام معادلة رياضية.' : 'This graph shows the general trend of a surface using a polynomial equation.',
-                krig: currentLang === 'ar' ? 'يوضح الرسم مفهوم السيميفاريوجرام المستخدم في الكريجينج.' : 'This graph illustrates the semivariogram concept used in Kriging.'
-            };
-            document.getElementById('chartContext').innerText = contextText[type];
-        }
-
-        function getChartData(type) {
-            const labels = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-            let data = [];
-            let color = '#1e3a8a';
-
-            if (type === 'idw') {
-                data = labels.map(l => l === 0 ? 100 : 1000 / (l * 0.5));
-                color = '#f97316';
-            } else if (type === 'poly') {
-                data = labels.map(l => 20 + (l * 0.4) - (l * l * 0.001));
-                color = '#1e3a8a';
-            } else {
-                data = labels.map(l => 10 + (Math.sin(l/10) * 15) + (l/2) - (l * l * 0.002));
-                color = '#10b981';
-            }
-
-            return {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: color + '22',
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 4,
-                    borderWidth: 3
-                }]
-            };
-        }
-
-        // Close modal when clicking outside
-        document.getElementById('modal').addEventListener('click', function(e) {
-            if (e.target.id === 'modal') {
-                closeModal();
-            }
-        });
-
-        // Initialize on load
-        window.onload = () => {
-            updateUI();
-        };
-
-    </script>
-</body>
-</html>
+  );
+}
